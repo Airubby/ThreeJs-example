@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <title>Example 02.04 - Geometries</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/ParametricGeometries.js"></script>
+    <script type="text/javascript" src="./libs/ConvexGeometry.js"></script>
+
+    <script type="text/javascript" src="./libs/stats.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.js"></script>
+    <style>
+        body {
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+<div id="Stats-output">
+</div>
+<div id="WebGL-output">
+</div>
+
+<script type="text/javascript">
+    var stats=initStats();
+
+    var scene=new THREE.Scene();
+
+    var camera=new THREE.PerspectiveCamera(45,window.innerWidth/window.innerHeight,0.01,1000);
+
+    var renderer=new THREE.WebGLRenderer();
+    renderer.setClearColor(new THREE.Color(0xeeeeee,1.0));
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    renderer.shadowMapEnabled=true;
+
+    var planeGeometry=new THREE.PlaneBufferGeometry(60,40,1,1);
+    var planeMaterial=new THREE.MeshLambertMaterial({
+        color:0xffffff
+    })
+    var plane=new THREE.Mesh(planeGeometry,planeMaterial);
+    plane.resiveShadow=true;
+    plane.rotation.x=-0.5*Math.PI;
+    plane.position.set(0,0,0);
+    scene.add(plane);
+
+    camera.position.set(-50,30,20);
+    camera.lookAt(new THREE.Vector3(-10,0,0));
+
+    var ambientLight=new THREE.AmbientLight(0x999999);
+    scene.add(ambientLight);
+
+    var spotLight=new THREE.SpotLight(0xffffff);
+    spotLight.castShadow=true;
+    spotLight.position.set(-40,40,50);
+    scene.add(spotLight);
+
+    addGeometries(scene);
+    
+    document.getElementById("WebGL-output").appendChild(renderer.domElement);
+
+    render();
+
+    function render(){
+        stats.update();
+        requestAnimationFrame(render);
+        renderer.render(scene,camera);
+    }
+
+    function addGeometries(scene){
+        var geoms=[];
+        geoms.push(new THREE.CylinderGeometry(1,4,4));  //三维几何体 顶部圆半径1,底部圆半径4,高度4
+        geoms.push(new THREE.BoxGeometry(4,4,4));  //立方体 长宽高4
+        geoms.push(new THREE.SphereGeometry(3));  //球体 半径3
+        geoms.push(new THREE.IcosahedronGeometry(4));  //二十面体
+        geoms.push(new THREE.OctahedronGeometry(4));  //八面体
+        geoms.push(new THREE.TetrahedronGeometry(3));  //四面体
+        geoms.push(new THREE.TorusGeometry(3,1,50,50,1.5*Math.PI));  //圆环几何体 3圆环半径，1圆环管子半径 长度方向上的分段数，宽度方向上的分段数，圆环长度
+        geoms.push(new THREE.TorusKnotGeometry(3,0.5));  //环面扭结(根管子绕着它自己转了几圈)  3圆环半径，1管子直径  radialSegments管子径向分成的段数8，tubularSegments管子长度方向上分成的段数64，p整个圆环围着圆心绕了多少圈大于等于1默认值是2；q整个圆环的内部扭了多少个结大于等于1默认是3
+        
+        geoms.push(new THREE.ParametricGeometry(THREE.ParametricGeometries.mobius3d, 20, 10)); //ParametricGeometry根据传入的公式，计算出相应的几何体
+        var points = [
+            new THREE.Vector3(2, 2, 2),
+            new THREE.Vector3(2, 2, -2),
+            new THREE.Vector3(-2, 2, -2),
+            new THREE.Vector3(-2, 2, 2),
+            new THREE.Vector3(2, -2, 2),
+            new THREE.Vector3(2, -2, -2),
+            new THREE.Vector3(-2, -2, -2),
+            new THREE.Vector3(-2, -2, 2)
+        ];
+        geoms.push(new THREE.ConvexGeometry(points));  //凸面体
+        
+        var pts = [];//points array - the path profile points will be stored here
+        var detail = .1;//half-circle detail - how many angle increments will be used to generate points
+        var radius = 3;//radius for half_sphere
+        for (var angle = 0.0; angle < Math.PI; angle += detail)//loop from 0.0 radians to PI (0 - 180 degrees)
+            pts.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));//angle/radius to x,z
+        geoms.push(new THREE.LatheGeometry(pts, 12));  //扫描体
+
+
+
+        var j=0;
+        for(var i=0;i<geoms.length;i++){
+            var cubeMaterial=new THREE.MeshLambertMaterial({
+                wireframe:true,  //是否将材质渲染成线框
+                color:Math.random()*0xffffff
+            })
+            var material=[
+                new THREE.MeshLambertMaterial({
+                    color:Math.random()*0xffffff,
+                    shading:THREE.FlatShading,  //着色方式：THREE.SmoothShading平滑着色，和THREE.FlatShading平面着色，
+                }),
+                new THREE.MeshBasicMaterial({
+                    color:0x000000,
+                    wireframe:true
+                })
+            ];
+            var mesh=THREE.SceneUtils.createMultiMaterialObject(geoms[i],material);  //SceneUtils工具类，创建多材质的几何体geoms[i]：几何体对象 material：材质数组
+            mesh.traverse(function(e){
+                e.castShadow=true;
+            })
+            mesh.position.x=-25+((i%4)*12);
+            mesh.position.y=4;
+            mesh.position.z=-8+(j*12);
+            if((i+1)%4==0) j++;
+            scene.add(mesh);
+        }
+    }
+    function initStats(){
+        var stats=new Stats();
+        stats.setMode(0);
+        stats.domElement.style.position="absolute";
+        stats.domElement.style.top="5px";
+        stats.domElement.style.left="5px";
+        document.getElementById("Stats-output").appendChild(stats.domElement);
+        return stats;
+    }
+
+</script>
+</body>
+</html>

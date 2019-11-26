@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="./libs/ParametricGeometries.js"></script>
+    <script type="text/javascript" src="./libs/stats.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.js"></script>
+
+</head>
+<body>
+    <div id="Stats-output">
+    </div>
+    <div id="WebGL-output">
+    </div>
+<script type="text/javascript">
+    var stats=initStats();
+
+    var scene=new THREE.Scene();
+    var camera=new THREE.PerspectiveCamera(45,window.innerWidth/window.innerHeight,0.01,1000);
+    var renderer=new THREE.WebGLRenderer();
+    renderer.setClearColor(new THREE.Color(0xeeeeee,1));
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    renderer.shadowMapEnabled=true;
+
+    var planeGeometry=new THREE.PlaneBufferGeometry(60,40,1,1);
+    var planeMaterial=new THREE.MeshLambertMaterial({color:0xffffff});
+    var plane=new THREE.Mesh(planeGeometry,planeMaterial);
+    plane.receiveShadow=true;
+
+    plane.rotation.x=-0.5*Math.PI;
+    plane.position.set(0,0,0);
+    scene.add(plane);
+
+    camera.position.set(-30,40,30);
+    camera.lookAt(scene.position);
+
+    var ambientLight=new THREE.AmbientLight(0x0c0c0c);
+    scene.add(ambientLight);
+
+    var spotLight=new THREE.SpotLight(0xffffff);
+    spotLight.position.set(-40,60,20);
+    spotLight.castShadow=true;
+    scene.add(spotLight);
+
+    document.getElementById("WebGL-output").appendChild(renderer.domElement);
+
+    var controls=new function(){
+        this.scaleX=1;
+        this.scaleY=1;
+        this.scaleZ=1;
+
+        this.positionX=0;
+        this.positionY=4;
+        this.positionZ=0;
+
+        this.rotationX=0;
+        this.rotationY=0;
+        this.rotationZ=0;
+
+        this.translateX=0;
+        this.translateY=0;
+        this.translateZ=0;
+
+        this.visible=true;
+
+    }
+
+    var material=new THREE.MeshLambertMaterial({color:0x44ff44});
+    var geom=new THREE.BoxGeometry(5,8,4);
+    var cube=new THREE.Mesh(geom,material);
+    cube.position.y=4;
+    cube.castShadow=true;
+    scene.add(cube);
+
+    var gui=new dat.GUI();
+
+    var guiScale=gui.addFolder('scale');
+    guiScale.add(controls,'scaleX',0,5);
+    guiScale.add(controls,'scaleY',0,5);
+    guiScale.add(controls,'scaleZ',0,5);
+
+    var guiPosition=gui.addFolder('position');
+    guiPosition.add(controls,'positionX',-10,10);
+    guiPosition.add(controls,'positionY',-10,10);
+    guiPosition.add(controls,'positionZ',-10,10);
+
+    var guiRotation=gui.addFolder('rotation');
+    guiRotation.add(controls,'rotationX',-4,4);
+    guiRotation.add(controls,'rotationY',-4,4);
+    guiRotation.add(controls,'rotationZ',-4,4);
+
+    var guiTranslate=gui.addFolder('translate');
+    guiTranslate.add(controls,'translateX',-10,10);
+    guiTranslate.add(controls,'translateY',-10,10);
+    guiTranslate.add(controls,'translateZ',-10,10);
+
+    gui.add(controls,'visible');
+
+    render();
+
+    function render(){
+        stats.update();
+        cube.visible=controls.visible;
+        cube.scale.set(controls.scaleX,controls.scaleY,controls.scaleZ);
+        cube.position.set(controls.positionX,controls.positionY,controls.positionZ);
+        cube.rotation.set(controls.rotationX,controls.rotationY,controls.rotationZ);
+        cube.translateX(controls.translateX);
+        cube.translateY(controls.translateY);
+        cube.translateZ(controls.translateZ);
+        requestAnimationFrame(render);
+        renderer.render(scene,camera);
+    }
+
+    function initStats(){
+        var stats=new Stats();
+        stats.setMode(0);
+        stats.domElement.style.position="absolute";
+        stats.domElement.style.left="5px";
+        stats.domElement.style.top="5px";
+        document.getElementById("Stats-output").appendChild(stats.domElement);
+        return stats;
+    }
+</script>
+</body>
+</html>

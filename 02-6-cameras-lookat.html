@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="./libs/ParametricGeometries.js"></script>
+    <script type="text/javascript" src="./libs/stats.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.js"></script>
+
+</head>
+<body>
+    <div id="Stats-output">
+    </div>
+    <div id="WebGL-output">
+    </div>
+<script type="text/javascript">
+    var stats=initStats();
+
+    var scene=new THREE.Scene();
+    var camera=new THREE.PerspectiveCamera(45,window.innerWidth/window.innerHeight,0.01,1000);
+    var renderer=new THREE.WebGLRenderer();
+    renderer.setClearColor(new THREE.Color(0xeeeeee,1));
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    renderer.shadowMapEnabled=true;
+
+    var planeGeometry=new THREE.PlaneBufferGeometry(180,180);
+    var planeMaterial=new THREE.MeshLambertMaterial({color:0xffffff});
+    var plane=new THREE.Mesh(planeGeometry,planeMaterial);
+    plane.receiveShadow=true;
+
+    plane.rotation.x=-0.5*Math.PI;
+    plane.position.set(0,0,0);
+    scene.add(plane);
+
+    camera.position.set(120,60,180);
+    camera.lookAt(scene.position);
+
+    var cubeGeometry=new THREE.BoxGeometry(4,4,4);
+    for(var i=0;i<planeGeometry.parameters.width/5;i++){
+        for(var j=0;j<planeGeometry.parameters.height/5;j++){
+            var rd=Math.random()*0.75+0.25;
+            var cubeMaterial=new THREE.MeshLambertMaterial();
+            cubeMaterial.color=new THREE.Color(rd,0,0);
+            var cube=new THREE.Mesh(cubeGeometry,cubeMaterial);
+            cube.position.z=-(planeGeometry.parameters.height/2)+2+(j*5);
+            cube.position.x=-(planeGeometry.parameters.width/2)+2+(i*5);
+            cube.position.y=2;
+            scene.add(cube);
+        }
+    }
+    var directionalLight=new THREE.DirectionalLight(0xffffff,0.7);
+    directionalLight.position.set(-20,40,60);
+    scene.add(directionalLight);
+
+    var ambientLight=new THREE.AmbientLight(0x292929);
+    scene.add(ambientLight);
+
+    document.getElementById("WebGL-output").appendChild(renderer.domElement);
+
+    var controls=new function(){
+        this.perspective="Perspective";
+        this.switchCamera=function(){
+            if(camera instanceof THREE.PerspectiveCamera){
+                //左右上下近远
+                camera=new THREE.OrthographicCamera(window.innerWidth / -16, window.innerWidth / 16, window.innerHeight / 16, window.innerHeight / -16, -200, 500);
+                this.perspective="Orthographic";
+            }else{
+                camera=new THREE.PerspectiveCamera(45,window.innerWidth/window.innerHeight,0.1,1000);
+                this.perspective="Perspective";
+            }
+            camera.position.set(120,60,180);
+            camera.lookAt(scene.position);
+        }
+    }
+
+    var gui=new dat.GUI();
+    gui.add(controls,"perspective").listen();
+    gui.add(controls,"switchCamera");
+
+
+    render();
+    var step=0;
+    function render(){
+        step+=0.02;
+        if(camera instanceof THREE.Camera){
+            var x=10+100*(Math.sin(step));
+            camera.lookAt(new THREE.Vector3(x,10,0));
+            lookAtMesh.position.copy(new THREE.Vector3(x, 10, 0));
+        }
+        stats.update();
+        requestAnimationFrame(render);
+        renderer.render(scene,camera);
+    }
+
+    function initStats(){
+        var stats=new Stats();
+        stats.setMode(0);
+        stats.domElement.style.position="absolute";
+        stats.domElement.style.left="5px";
+        stats.domElement.style.top="5px";
+        document.getElementById("Stats-output").appendChild(stats.domElement);
+        return stats;
+    }
+</script>
+</body>
+</html>
