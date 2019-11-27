@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/stats.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.js"></script>
+    <style>
+        body {
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="Stats-output">
+    </div>
+    <div id="WebGL-output">
+    </div>
+<script type="text/javascript">
+    var stats = initStats();
+
+    var scene = new THREE.Scene();
+    //MeshDepthMaterial 材质，特点是其外观不是由光照或某个材质属性决定的；而是由物体到相机的距离决定的
+    //scene.overrideMaterial 覆盖全局材质属性
+    // scene.overrideMaterial = new THREE.MeshDepthMaterial();
+
+    var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setClearColor(new THREE.Color(0x00000, 1.0));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMapEnabled = true;
+
+    camera.position.set(-50,40,50);
+    camera.near = 7;
+    camera.far = 139;
+    camera.lookAt(scene.position);
+
+    document.getElementById("WebGL-output").appendChild(renderer.domElement);
+
+    var step = 0;
+    var controls = new function () {
+        this.cameraNear = camera.near;
+        this.cameraFar = camera.far;
+        this.rotationSpeed = 0.02;
+        this.numberOfObjects = scene.children.length;
+
+        this.color = 0x00ff00;
+        this.overrideMaterial=false;
+
+        this.removeCube = function () {
+            var allChildren = scene.children;
+            var lastObject = allChildren[allChildren.length - 1];
+            if (lastObject instanceof THREE.Mesh) {
+                scene.remove(lastObject);
+                this.numberOfObjects = scene.children.length;
+            }
+        };
+
+        this.addCube = function () {
+
+            var cubeSize = Math.ceil(3 + (Math.random() * 3));
+            var cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+            
+            //添加指定材质
+            // var cubeMaterial = new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff});
+            // var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+
+            //添加改变的材质
+            var cubeMaterial = new THREE.MeshDepthMaterial();
+            var colorMaterial = new THREE.MeshBasicMaterial({
+                color: controls.color,
+                transparent: true,  //true 指定一个融合模式
+                blending: THREE.MultiplyBlending  //transparent设置为true，three.js会检查blending属性，融合模式使用的THREE.MultiplyBlending对象
+            });
+            //调用THREE.SceneUtils.createMultiMaterialObject()方法实例化，进行融合
+            var cube = new THREE.SceneUtils.createMultiMaterialObject(cubeGeometry, [colorMaterial, cubeMaterial]);
+            //当使用THREE.SceneUtils.createMultiMaterialObject()创建网格的时候，几何体会被复制，返回一个网格组，里面的两个网格完全相同。
+            //正因为两个网格是重合相同的，所以如果立方体动起来就会发现立方体会有闪烁的效果，这是因为当渲染的物体有重合的时候，就会出现这种效果。
+            //这种情况，我们就需要设置一些偏差处理这个问题，所以我们缩小了THREE.MeshDepthMaterial网格的大小，来实现了目的。
+            cube.children[1].scale.set(0.99, 0.99, 0.99);
+            cube.castShadow = true;
+
+            // position the cube randomly in the scene
+            cube.position.x = -60 + Math.round((Math.random() * 100));
+            cube.position.y = Math.round((Math.random() * 10));
+            cube.position.z = -100 + Math.round((Math.random() * 150));
+
+            // add the cube to the scene
+            scene.add(cube);
+            this.numberOfObjects = scene.children.length;
+        };
+
+        this.outputObjects = function () {
+            console.log(scene.children);
+        }
+    };
+
+    var gui = new dat.GUI();
+    gui.addColor(controls, 'color');
+    gui.add(controls, 'rotationSpeed', 0, 0.5);
+    gui.add(controls, 'addCube');
+    gui.add(controls, 'removeCube');
+    gui.add(controls, 'cameraNear', 0, 50).onChange(function (e) {
+        camera.near = e;
+    });
+    gui.add(controls, 'cameraFar', 50, 200).onChange(function (e) {
+        camera.far = e;
+    });
+    gui.add(controls,'overrideMaterial').onChange(function(e){
+        console.log(e)
+        if(e){
+            scene.overrideMaterial = new THREE.MeshDepthMaterial();
+        }else{
+            scene.overrideMaterial = null;
+        }
+    })
+
+    //初始化10个box
+    var i = 0;
+    while (i < 10) {
+        controls.addCube();
+        i++;
+    }
+
+    render();
+
+    function render() {
+        stats.update();
+        //	 该方法也可以遍历调用者和调用者的所有后代，function 参数是一个函数，被调用者和每一个后代对象调用 function 方法。
+        scene.traverse(function (e) {
+            if (e instanceof THREE.Mesh) {
+
+                e.rotation.x += controls.rotationSpeed;
+                e.rotation.y += controls.rotationSpeed;
+                e.rotation.z += controls.rotationSpeed;
+            }
+        });
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+    }
+
+    function initStats(){
+        var stats=new Stats();
+        stats.setMode(0);
+        stats.domElement.style.position="absolute";
+        stats.domElement.style.left="5px";
+        stats.domElement.style.top="5px";
+        document.getElementById("Stats-output").appendChild(stats.domElement);
+        return stats;
+    }
+</script>
+</body>
+</html>

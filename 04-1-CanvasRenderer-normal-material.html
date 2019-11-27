@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="./libs/stats.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.js"></script>
+    <!-- Canvas渲染引用以下js -->
+    <script type="text/javascript" src="./libs/CanvasRenderer.js"></script>
+    <script type="text/javascript" src="./libs/Projector.js"></script>
+    <style>
+        body {
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="Stats-output">
+    </div>
+    <div id="WebGL-output">
+    </div>
+<script type="text/javascript">
+    var stats = initStats();
+
+    var scene = new THREE.Scene();
+
+    var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    var renderer;
+    var webGLRenderer = new THREE.WebGLRenderer();
+    webGLRenderer.setClearColor(new THREE.Color(0xEEEEEE, 1.0));
+    webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+    webGLRenderer.shadowMapEnabled = true;
+
+    var canvasRenderer = new THREE.CanvasRenderer();
+    canvasRenderer.setSize(window.innerWidth, window.innerHeight);
+
+    renderer=webGLRenderer;
+
+    var groundMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry (100, 100, 4, 4), new THREE.MeshBasicMaterial({color: 0x777777}));
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.y = -20;
+    scene.add(groundMesh);
+
+    var sphereGeometry = new THREE.SphereGeometry(14, 20, 20);
+    var cubeGeometry = new THREE.BoxGeometry(15, 15, 15);
+    var planeGeometry = new THREE.PlaneBufferGeometry(14, 14, 4, 4);
+
+    //下面color，wireFrameLineJoin的只能MeshBasicMaterial使用
+    // var meshMaterial = new THREE.MeshBasicMaterial({color: 0x7777ff});  
+    //MeshNormalMaterial是一种将法向量映射到 RGB 颜色的材质,每个面的颜色都不一样
+    var meshMaterial = new THREE.MeshNormalMaterial({color: 0x7777ff});
+
+    var sphere = new THREE.Mesh(sphereGeometry, meshMaterial);
+    var cube = new THREE.Mesh(cubeGeometry, meshMaterial);
+    var plane = new THREE.Mesh(planeGeometry, meshMaterial);
+
+    sphere.position.set(0,2,3);
+
+    for (var f = 0, fl = sphere.geometry.faces.length; f < fl; f++) {
+        var face = sphere.geometry.faces[f];
+        //定义三维向量
+        var centroid = new THREE.Vector3(0, 0, 0);
+        //将三个面顶点的索引传给sphere.geometry.vertices找到其顶点的坐标，再添加到centroid
+        centroid.add(sphere.geometry.vertices[face.a]);
+        centroid.add(sphere.geometry.vertices[face.b]);
+        centroid.add(sphere.geometry.vertices[face.c]);
+        centroid.divideScalar(3); //三角形的中心点坐标
+
+         //箭头辅助线，相当于把法向量用箭头表示出来
+        var arrow = new THREE.ArrowHelper(
+            face.normal, //face这个面的法向量
+            centroid,
+            2,
+            0x3333FF,
+            0.5,
+            0.5);
+
+        sphere.add(arrow);
+    }
+
+    cube.position = sphere.position;
+    plane.position = sphere.position;
+
+    scene.add(cube);
+
+    camera.position.set(-20,30,40);
+    camera.lookAt(new THREE.Vector3(10, 0, 0));
+
+    var ambientLight = new THREE.AmbientLight(0x0c0c0c);
+    scene.add(ambientLight);
+
+    var spotLight = new THREE.SpotLight(0xffffff);
+    spotLight.position.set(-40, 60, -10);
+    spotLight.castShadow = true;
+    scene.add(spotLight);
+
+
+    document.getElementById("WebGL-output").appendChild(renderer.domElement);
+
+    var step = 0;
+    var oldContext = null;
+    var controls=new function(){
+        this.rotationSpeed = 0.02;
+        this.bouncingSpeed = 0.03;
+
+        this.opacity = meshMaterial.opacity;
+        this.transparent = meshMaterial.transparent;  //是否透明，透明开关true
+        this.overdraw = meshMaterial.overdraw;  //过度描绘
+        this.visible = meshMaterial.visible;  //是否可见
+        this.side = "front";  //侧面，指定某个面THREE.FrontSide（BackSide，DoubleSide）
+
+        // this.color = meshMaterial.color.getStyle(); //设置材质的颜色
+        this.wireframe = meshMaterial.wireframe;  //是否设为线框模式
+        this.wireframeLinewidth = meshMaterial.wireframeLinewidth; //线框的宽度（还有其他设置属性）
+        // this.wireFrameLineJoin = meshMaterial.wireframeLinejoin;  //线框线段连接点(可选的值有round（圆）、bevel（斜角）和miter（尖角）。默认值为round)
+
+        this.selectedMesh = "cube";
+
+        this.switchRenderer = function () {
+            document.getElementById("WebGL-output").removeChild(renderer.domElement);
+            if (renderer instanceof THREE.WebGLRenderer) {
+                renderer = canvasRenderer;
+            } else {
+                renderer = webGLRenderer;
+            }
+            document.getElementById("WebGL-output").appendChild(renderer.domElement);
+        }
+
+        this.shadow = "flat";
+
+    }
+
+
+    var gui = new dat.GUI();
+
+    var spGui = gui.addFolder("Mesh");
+    spGui.add(controls, 'opacity', 0, 1).onChange(function (e) {
+        meshMaterial.opacity = e
+    });
+    spGui.add(controls, 'transparent').onChange(function (e) {
+        meshMaterial.transparent = e
+    });
+    spGui.add(controls, 'wireframe').onChange(function (e) {
+        meshMaterial.wireframe = e
+    });
+    spGui.add(controls, 'wireframeLinewidth', 0, 20).onChange(function (e) {
+        meshMaterial.wireframeLinewidth = e
+    });
+    spGui.add(controls, 'visible').onChange(function (e) {
+        meshMaterial.visible = e
+    });
+    spGui.add(controls, 'side', ["front", "back", "double"]).onChange(function (e) {
+        switch (e) {
+            case "front":
+                meshMaterial.side = THREE.FrontSide;
+                break;
+            case "back":
+                meshMaterial.side = THREE.BackSide;
+                break;
+            case "double":
+                meshMaterial.side = THREE.DoubleSide;
+                break;
+        }
+        meshMaterial.needsUpdate = true;  //NeedUpdate属性设为true来告诉renderer我需要重新传输数据了,为false使用缓存中的
+    });
+    spGui.add(controls, 'shadow', ["flat", "smooth"]).onChange(function (e) {
+        switch (e) {
+            //shading（着色方式） THREE.SmoothShading平滑着色，和THREE.FlatShading平面着色
+            //平面着色的话，每个面是什么颜色就会被渲染成什么颜色，而平滑着色的话可以使物体的表面看起来变的更光滑一些
+            case "flat":
+                meshMaterial.shading = THREE.FlatShading;
+                break;
+            case "smooth":
+                meshMaterial.shading = THREE.SmoothShading;
+                break;
+        }
+
+        var oldPos = sphere.position.clone();
+        scene.remove(sphere);
+        scene.remove(plane);
+        scene.remove(cube);
+        sphere = new THREE.Mesh(sphere.geometry.clone(), meshMaterial);
+        cube = new THREE.Mesh(cube.geometry.clone(), meshMaterial);
+        plane = new THREE.Mesh(plane.geometry.clone(), meshMaterial);
+
+        sphere.position = oldPos;
+        cube.position = oldPos;
+        plane.position = oldPos;
+
+        switch (controls.selectedMesh) {
+            case "cube":
+                scene.add(cube);
+                break;
+            case "sphere":
+                scene.add(sphere);
+                break;
+            case "plane":
+                scene.add(plane);
+                break;
+        }
+
+        meshMaterial.needsUpdate = true;
+    });
+    // spGui.addColor(controls, 'color').onChange(function (e) {
+    //     meshMaterial.color.setStyle(e)
+    // });
+    spGui.add(controls, 'selectedMesh', ["cube", "sphere", "plane"]).onChange(function (e) {
+        scene.remove(plane);
+        scene.remove(cube);
+        scene.remove(sphere);
+        switch (e) {
+            case "cube":
+                scene.add(cube);
+                break;
+            case "sphere":
+                scene.add(sphere);
+                break;
+            case "plane":
+                scene.add(plane);
+                break;
+
+        }
+        scene.add(e);
+    });
+
+    gui.add(controls, 'switchRenderer');
+
+    var cvGui = gui.addFolder("Canvas renderer");
+    cvGui.add(controls, 'overdraw').onChange(function (e) {
+        meshMaterial.overdraw = e
+    });
+    // cvGui.add(controls, 'wireFrameLineJoin', ['round', 'bevel', 'miter']).onChange(function (e) {
+    //     meshMaterial.wireframeLinejoin = e
+    // });
+
+
+
+    render();
+
+    function render() {
+        stats.update();
+        // rotate the cube around its axes
+        cube.rotation.y = step += 0.01;
+        plane.rotation.y = step;
+        sphere.rotation.y = step;
+
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+    }
+
+    function initStats(){
+        var stats=new Stats();
+        stats.setMode(0);
+        stats.domElement.style.position="absolute";
+        stats.domElement.style.left="5px";
+        stats.domElement.style.top="5px";
+        document.getElementById("Stats-output").appendChild(stats.domElement);
+        return stats;
+    }
+</script>
+</body>
+</html>
