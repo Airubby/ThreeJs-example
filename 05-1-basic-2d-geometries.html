@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="./libs/stats.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.js"></script>
+    <style>
+        body {
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+  
+</head>
+<body>
+    <div id="Stats-output">
+    </div>
+    <div id="WebGL-output">
+    </div>
+<script type="text/javascript">
+    var stats = initStats();
+
+    var scene = new THREE.Scene();
+
+    var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setClearColor(new THREE.Color(0x000000, 1.0));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMapEnabled = true;
+    
+    var plane = createMesh(new THREE.PlaneBufferGeometry(10, 14, 4, 4));
+    scene.add(plane);
+
+    var circle = createMesh(new THREE.CircleGeometry(4, 10, 0.3 * Math.PI * 2, 0.3 * Math.PI * 2));
+    circle.position.set(-10,0,0);
+    scene.add(circle);
+
+    var shape = createMesh(new THREE.ShapeGeometry(drawShape()));
+    shape.position.set(10,0,0);
+    scene.add(shape);
+
+    camera.position.set(-20,30,50);
+    camera.lookAt(new THREE.Vector3(10, 0, 0));
+
+
+    var spotLight = new THREE.SpotLight(0xffffff);
+    spotLight.position.set(-40, 60, -10);
+    scene.add(spotLight);
+
+    document.getElementById("WebGL-output").appendChild(renderer.domElement);
+
+
+    var step = 0;
+    var controls = new function () {
+        this.width = plane.children[0].geometry.parameters.width;
+        this.height = plane.children[0].geometry.parameters.height;
+        this.widthSegments = plane.children[0].geometry.parameters.widthSegments;
+        this.heightSegments = plane.children[0].geometry.parameters.heightSegments;
+
+        this.radius = 4;
+        this.thetaStart = 0.3 * Math.PI * 2;
+        this.thetaLength = 0.3 * Math.PI * 2;
+        this.segments = 10;
+
+        this.redraw = function () {
+            scene.remove(plane);
+            plane = createMesh(new THREE.PlaneBufferGeometry(controls.width, controls.height, Math.round(controls.widthSegments), Math.round(controls.heightSegments)));
+            scene.add(plane);
+
+            scene.remove(circle);
+            circle = createMesh(new THREE.CircleGeometry(controls.radius, controls.segments, controls.thetaStart, controls.thetaLength));
+            circle.position.set(-10,0,0);
+            scene.add(circle);
+        };
+
+        this.asGeom = function () {
+            scene.remove(shape);
+            shape = createMesh(new THREE.ShapeGeometry(drawShape()));
+            scene.add(shape);
+        };
+
+        this.asPoints = function () {
+            scene.remove(shape);
+            shape = createLine(drawShape(), false);
+            scene.add(shape);
+        };
+
+        this.asSpacedPoints = function () {
+            scene.remove(shape);
+            shape = createLine(drawShape(), true);
+            scene.add(shape);
+        };
+
+    };
+
+    var gui = new dat.GUI();
+    var spGui = gui.addFolder("Plane");
+    spGui.add(controls, 'width', 0, 40).onChange(controls.redraw);
+    spGui.add(controls, 'height', 0, 40).onChange(controls.redraw);
+    spGui.add(controls, 'widthSegments', 0, 10).onChange(controls.redraw);
+    spGui.add(controls, 'heightSegments', 0, 10).onChange(controls.redraw);
+    var scGui = gui.addFolder("Circle");
+    scGui.add(controls, 'radius', 0, 40).onChange(controls.redraw);
+    scGui.add(controls, 'segments', 0, 40).onChange(controls.redraw);
+    scGui.add(controls, 'thetaStart', 0, 2 * Math.PI).onChange(controls.redraw);
+    scGui.add(controls, 'thetaLength', 0, 2 * Math.PI).onChange(controls.redraw);
+    
+    render();
+
+    function createMesh(geom) {
+
+        // assign two materials
+        var meshMaterial = new THREE.MeshNormalMaterial();
+        meshMaterial.side = THREE.DoubleSide;
+        var wireFrameMat = new THREE.MeshBasicMaterial();
+        wireFrameMat.wireframe = true;
+
+        // create a multimaterial
+        var plane = THREE.SceneUtils.createMultiMaterialObject(geom, [meshMaterial, wireFrameMat]);
+
+        return plane;
+    }
+
+    function render() {
+        stats.update();
+
+        plane.rotation.y = step += 0.01;
+
+        circle.rotation.y = step += 0.01;
+
+        shape.rotation.y = step += 0.01;
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+    }
+
+    function initStats(){
+        var stats=new Stats();
+        stats.setMode(0);
+        stats.domElement.style.position="absolute";
+        stats.domElement.style.left="5px";
+        stats.domElement.style.top="5px";
+        document.getElementById("Stats-output").appendChild(stats.domElement);
+        return stats;
+    }
+    
+    function drawShape() {
+
+        // create a basic shape
+        var shape = new THREE.Shape();
+
+        // 将绘图点移动到某个位置
+        shape.moveTo(10, 10);
+
+        // 从开始点连接到指定点
+        shape.lineTo(10, 40);
+
+        // 三次贝塞尔曲线 依次为第一个贝塞尔控制点的 x 坐标，y坐标；第二个的x,y坐标；结束点的x,y坐标; 开始点都是moveTo(10, 10);
+        shape.bezierCurveTo(15, 25, 25, 25, 30, 40);
+
+        // 沿着所给定的点，绘制一条光滑的曲线
+        shape.splineThru(
+                [new THREE.Vector2(32, 30),
+                    new THREE.Vector2(28, 20),
+                    new THREE.Vector2(30, 10),
+                ]);
+
+        // 二次贝塞尔曲线 依次为第一个控制点的x,y坐标；结束点的x,y坐标； 开始点都是moveTo(10, 10);
+        shape.quadraticCurveTo(20, 15, 10, 10);
+
+      
+        var hole1 = new THREE.Path();
+        //absellipse 椭圆(x,y,xradius,yradius,startAngle,endAngle,是否顺时针画圆)
+        hole1.absellipse(16, 24, 2, 3, 0, Math.PI * 2, true);
+        shape.holes.push(hole1);
+
+        var hole2 = new THREE.Path();
+        hole2.absellipse(23, 24, 2, 3, 0, Math.PI * 2, true);
+        shape.holes.push(hole2);
+
+        var hole3 = new THREE.Path();
+        //absarc 圆
+        hole3.absarc(20, 16, 2, 0, Math.PI, true);
+        shape.holes.push(hole3);
+
+        return shape;
+    }
+    function createLine(shape, spaced) {
+        console.log(shape);
+        if (!spaced) {
+            var mesh = new THREE.Line(shape.createPointsGeometry(10), new THREE.LineBasicMaterial({
+                color: 0xff3333,
+                linewidth: 2
+            }));
+            return mesh;
+        } else {
+            var mesh = new THREE.Line(shape.createSpacedPointsGeometry(3), new THREE.LineBasicMaterial({
+                color: 0xff3333,
+                linewidth: 2
+            }));
+            return mesh;
+        }
+
+    }
+</script>
+</body>
+</html>

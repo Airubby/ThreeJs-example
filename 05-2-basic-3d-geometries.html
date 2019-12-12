@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="./libs/stats.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.js"></script>
+    <style>
+        body {
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+  
+</head>
+<body>
+    <div id="Stats-output">
+    </div>
+    <div id="WebGL-output">
+    </div>
+<script type="text/javascript">
+    var stats = initStats();
+
+    var scene = new THREE.Scene();
+
+    var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setClearColor(new THREE.Color(0x000000, 1.0));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMapEnabled = true;
+    
+    //cube 正方体
+    var cube = createMesh(new THREE.BoxGeometry(10, 10, 10, 1, 1, 1));
+    cube.position.set(0,15,0);
+    scene.add(cube);
+    //sphere 球体
+    var sphere = createMesh(new THREE.SphereGeometry(4, 10, 10));
+    sphere.position.set(-15,20,0);
+    scene.add(sphere);
+    //cylinder  圆柱体（顶部半径，底部半径，高度）
+    var cylinder = createMesh(new THREE.CylinderGeometry(3, 3, 10));
+    cylinder.position.set(-15,-10,0);
+    scene.add(cylinder);
+    //torus 圆环(圆环的半径尺寸,义圆环的管子半径,圆环长度方向上的分段数,圆环宽度方向上的分段数,圆环绘制的长度)
+    var torus = createMesh(new THREE.TorusGeometry(4, 2, 8, 6, Math.PI * 2));
+    torus.position.set(30,10,0);
+    scene.add(torus);
+    //knot 环面扭结(整个圆环的半径,管子的直径,管子径向分成的段数,子长度方向上分成的段数,圆环围着圆心绕了多少圈,圆环的内部扭了多少个结,缩放比例)
+    var knot = createMesh(new THREE.TorusKnotGeometry(4, 1, 64, 8, 2, 3, 1));
+    knot.position.set(30,-20,0);
+    scene.add(knot);
+    //polyhedron 多面几何体
+    var polyhedron = createMesh(new THREE.IcosahedronGeometry(10, 0));
+    polyhedron.position.set(0,-15,0);
+    scene.add(polyhedron);
+
+    camera.position.set(-20,30,50);
+    camera.lookAt(new THREE.Vector3(10, 0, 0));
+
+
+    var spotLight = new THREE.SpotLight(0xffffff);
+    spotLight.position.set(-40, 60, -10);
+    scene.add(spotLight);
+
+    document.getElementById("WebGL-output").appendChild(renderer.domElement);
+
+
+    var step=0;
+    var controls = new function () {
+        //cube
+        this.width = cube.children[0].geometry.parameters.width;
+        this.height = cube.children[0].geometry.parameters.height;
+        this.depth = cube.children[0].geometry.parameters.depth;
+        this.widthSegments = cube.children[0].geometry.parameters.widthSegments;
+        this.heightSegments = cube.children[0].geometry.parameters.heightSegments;
+        this.depthSegments = cube.children[0].geometry.parameters.depthSegments;
+        //sphere
+        this.radius = sphere.children[0].geometry.parameters.radius;
+        this.spherewidthSegments = sphere.children[0].geometry.parameters.widthSegments;
+        this.sphereheightSegments = sphere.children[0].geometry.parameters.heightSegments;
+        this.phiStart = 0;
+        this.phiLength = Math.PI * 2;
+        this.thetaStart = 0;
+        this.thetaLength = Math.PI;
+        //cylinder
+        this.radiusTop = 3;
+        this.radiusBottom = 3;
+        this.cylinderheight = 10;
+        this.radialSegments = 8;
+        this.cylinderheightSegments = 8;
+        this.openEnded = false;
+        //torus
+        this.torusradius = torus.children[0].geometry.parameters.radius;
+        this.tube = torus.children[0].geometry.parameters.tube;
+        this.torusradialSegments = torus.children[0].geometry.parameters.radialSegments;
+        this.tubularSegments = torus.children[0].geometry.parameters.tubularSegments;
+        this.arc = torus.children[0].geometry.parameters.arc;
+        //knot
+        this.knotradius = knot.children[0].geometry.parameters.radius;
+        this.knottube = 0.3;
+        this.knotradialSegments = knot.children[0].geometry.parameters.radialSegments;
+        this.knottubularSegments = knot.children[0].geometry.parameters.tubularSegments;
+        this.p = knot.children[0].geometry.parameters.p;
+        this.q = knot.children[0].geometry.parameters.q;
+        this.heightScale = knot.children[0].geometry.parameters.heightScale;
+        //polyhedron
+        this.polyhedronradius = 10;
+        this.detail = 0;
+        this.type = 'Icosahedron';
+
+        this.redraw = function () {
+            //cube
+            scene.remove(cube);
+            cube = createMesh(new THREE.BoxGeometry(controls.width, controls.height, controls.depth, Math.round(controls.widthSegments), Math.round(controls.heightSegments), Math.round(controls.depthSegments)));
+            cube.position.set(0,15,0);
+            scene.add(cube);
+            //sphere
+            scene.remove(sphere);
+            sphere = createMesh(new THREE.SphereGeometry(controls.radius, controls.spherewidthSegments, controls.sphereheightSegments, controls.phiStart, controls.phiLength, controls.thetaStart, controls.thetaLength));
+            sphere.position.set(-15,20,0);
+            scene.add(sphere);
+            //cylinder
+            scene.remove(cylinder);
+            cylinder = createMesh(new THREE.CylinderGeometry(controls.radiusTop, controls.radiusBottom, controls.cylinderheight, controls.radialSegments, controls.cylinderheightSegments, controls.openEnded));
+            cylinder.position.set(-15,-10,0);
+            scene.add(cylinder);
+            //torus
+            scene.remove(torus);
+            torus = createMesh(new THREE.TorusGeometry(controls.torusradius, controls.tube, Math.round(controls.torusradialSegments), Math.round(controls.torustubularSegments), controls.arc));
+            torus.position.set(30,10,0);
+            scene.add(torus);
+            //knot
+            scene.remove(knot);
+            knot = createMesh(new THREE.TorusKnotGeometry(controls.knotradius, controls.knottube, Math.round(controls.knotradialSegments), Math.round(controls.knottubularSegments), Math.round(controls.p), Math.round(controls.q), controls.heightScale));
+            knot.position.set(30,-20,0);
+            scene.add(knot);
+            //polyhedron
+            scene.remove(polyhedron);
+            switch (controls.type) {
+                case 'Icosahedron':
+                    polyhedron = createMesh(new THREE.IcosahedronGeometry(controls.polyhedronradius, controls.detail));
+                    break;
+                case 'Tetrahedron':
+                    polyhedron = createMesh(new THREE.TetrahedronGeometry(controls.polyhedronradius, controls.detail));
+                    break;
+                case 'Octahedron':
+                    polyhedron = createMesh(new THREE.OctahedronGeometry(controls.polyhedronradius, controls.detail));
+                    break;
+                case 'Dodecahedron':
+                    polyhedron = createMesh(new THREE.DodecahedronGeometry(controls.polyhedronradius, controls.detail));
+                    break;
+                case 'Custom':
+                    var vertices = [
+                        1, 1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1
+                    ];
+
+                    var indices = [
+                        2, 1, 0, 0, 3, 2, 1, 3, 0, 2, 3, 1
+                    ];
+
+                    polyhedron = createMesh(new THREE.PolyhedronGeometry(vertices, indices, controls.polyhedronradius, controls.detail));
+                    break;
+            }
+            polyhedron.position.set(0,-15,0);
+            scene.add(polyhedron);
+        };
+    };
+
+    var gui = new dat.GUI();
+    //cube
+    var cubeGui=gui.addFolder("cubeGui");
+    cubeGui.add(controls, 'width', 0, 40).onChange(controls.redraw);
+    cubeGui.add(controls, 'height', 0, 40).onChange(controls.redraw);
+    cubeGui.add(controls, 'depth', 0, 40).onChange(controls.redraw);
+    cubeGui.add(controls, 'widthSegments', 0, 10).onChange(controls.redraw);
+    cubeGui.add(controls, 'heightSegments', 0, 10).onChange(controls.redraw);
+    cubeGui.add(controls, 'depthSegments', 0, 10).onChange(controls.redraw);
+    //sphere
+    var sphereGui=gui.addFolder("sphereGui");
+    sphereGui.add(controls, 'radius', 0, 40).onChange(controls.redraw);
+    sphereGui.add(controls, 'spherewidthSegments', 0, 20).onChange(controls.redraw);
+    sphereGui.add(controls, 'sphereheightSegments', 0, 20).onChange(controls.redraw);
+    sphereGui.add(controls, 'phiStart', 0, 2 * Math.PI).onChange(controls.redraw);
+    sphereGui.add(controls, 'phiLength', 0, 2 * Math.PI).onChange(controls.redraw);
+    sphereGui.add(controls, 'thetaStart', 0, 2 * Math.PI).onChange(controls.redraw);
+    sphereGui.add(controls, 'thetaLength', 0, 2 * Math.PI).onChange(controls.redraw);
+    //cylinder
+    var cylinderGui=gui.addFolder("cylinderGui");
+    cylinderGui.add(controls, 'radiusTop', -40, 40).onChange(controls.redraw);
+    cylinderGui.add(controls, 'radiusBottom', -40, 40).onChange(controls.redraw);
+    cylinderGui.add(controls, 'cylinderheight', 0, 40).onChange(controls.redraw);
+    cylinderGui.add(controls, 'radialSegments', 1, 20).step(1).onChange(controls.redraw);
+    cylinderGui.add(controls, 'cylinderheightSegments', 1, 20).step(1).onChange(controls.redraw);
+    cylinderGui.add(controls, 'openEnded').onChange(controls.redraw);
+    //torus
+    var torusGui=gui.addFolder("torusGui");
+    torusGui.add(controls, 'torusradius', 0, 40).onChange(controls.redraw);
+    torusGui.add(controls, 'tube', 0, 40).onChange(controls.redraw);
+    torusGui.add(controls, 'torusradialSegments', 0, 40).onChange(controls.redraw);
+    torusGui.add(controls, 'tubularSegments', 1, 20).onChange(controls.redraw);
+    torusGui.add(controls, 'arc', 0, Math.PI * 2).onChange(controls.redraw);
+    //knot
+    var knotGui=gui.addFolder("knotGui");
+    knotGui.add(controls, 'knotradius', 0, 40).onChange(controls.redraw);
+    knotGui.add(controls, 'knottube', 0, 40).onChange(controls.redraw);
+    knotGui.add(controls, 'knotradialSegments', 0, 400).step(1).onChange(controls.redraw);
+    knotGui.add(controls, 'knottubularSegments', 1, 20).step(1).onChange(controls.redraw);
+    knotGui.add(controls, 'p', 1, 10).step(1).onChange(controls.redraw);
+    knotGui.add(controls, 'q', 1, 15).step(1).onChange(controls.redraw);
+    knotGui.add(controls, 'heightScale', 0, 5).onChange(controls.redraw);
+    //polyhedron
+    var polyhedronGui=gui.addFolder("polyhedronGui");
+    polyhedronGui.add(controls, 'polyhedronradius', 0, 40).step(1).onChange(controls.redraw);
+    polyhedronGui.add(controls, 'detail', 0, 3).step(1).onChange(controls.redraw);
+    polyhedronGui.add(controls, 'type', ['Icosahedron', 'Tetrahedron', 'Octahedron', 'Dodecahedron', 'Custom']).onChange(controls.redraw);
+
+
+    render();
+
+    function render() {
+        stats.update();
+
+        cube.rotation.y = step += 0.01;
+        sphere.rotation.y=step+=0.01;
+        cylinder.rotation.y = step += 0.01;
+        torus.rotation.y=step+=0.01;
+        knot.rotation.y=step+=0.01;
+        polyhedron.rotation.y = step += 0.01;
+
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+    }
+
+    function initStats(){
+        var stats=new Stats();
+        stats.setMode(0);
+        stats.domElement.style.position="absolute";
+        stats.domElement.style.left="5px";
+        stats.domElement.style.top="5px";
+        document.getElementById("Stats-output").appendChild(stats.domElement);
+        return stats;
+    }
+    
+    function createMesh(geom){
+        //MeshNormalMaterial是一种不受渲染时使用的颜色影响的材质，它只与自己每一个面从内到外的法向量有关。法向量在webgl中用处十分广泛，光的反射，以及三维图形的纹理映射都与这个有关。
+        var meshMaterial = new THREE.MeshNormalMaterial();
+        meshMaterial.side = THREE.DoubleSide;  //边的渲染方式，有三种，前面，后面，还有双面
+        //MeshBasicMaterial是一种非常简单的材质，这种材质不考虑场景中光照的影响。使用这种材质的网格会被渲染成简单的平面多边形，而且也可以显示几何体的线框。
+        var wireFrameMat = new THREE.MeshBasicMaterial();
+        wireFrameMat.wireframe = true;
+        //一种几何体应用多种材质THREE.SceneUtils.createMultiMaterialObject
+        var mesh = THREE.SceneUtils.createMultiMaterialObject(geom, [meshMaterial, wireFrameMat]);
+
+        return mesh;
+    }
+    
+</script>
+</body>
+</html>
